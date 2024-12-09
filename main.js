@@ -155,10 +155,12 @@ loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json
         uniforms: {
             glowColor: { type: 'c', value: new THREE.Color(0xffffff) },
             viewVector: { type: 'v3', value: camera.position },
-            time: { type: 'f', value: 0.0 }
+            time: { type: 'f', value: 0.0 },
+            ambientLight: { value: 0.3 }
         },
         vertexShader: `
             uniform vec3 viewVector;
+            varying vec3 vNormal;
             varying float intensity;
             void main() {
                 vec3 vNormal = normalize(normalMatrix * normal);
@@ -170,6 +172,8 @@ loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json
         fragmentShader: `
             uniform vec3 glowColor;
             uniform float time;
+            uniform float ambientLight;
+            varying vec3 vNormal;
             varying float intensity;
             void main() {
                 float pulseFactor = 1.0 + 0.3 * sin(time * 2.0);
@@ -177,7 +181,7 @@ loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json
                 gl_FragColor = vec4(glow, 1.0);
             }
         `,
-        side: THREE.FrontSide,
+        side: THREE.DoubleSide,
         blending: THREE.AdditiveBlending,
         transparent: true,
         depthWrite: false
@@ -191,6 +195,50 @@ loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json
     const pointLight = new THREE.PointLight(0xffffff, 2, 50);
     pointLight.position.set(0, 0, 0);
     scene.add(pointLight);
+});
+
+// Add keyboard controls
+const moveSpeed = 0.5; // Adjust speed as needed
+
+// Keyboard event listener
+window.addEventListener('keydown', (event) => {
+    switch(event.key.toLowerCase()) {
+        // Cube movement
+        case 'w':
+            if (cube) {
+                cube.position.y += moveSpeed;
+                // Update point light position
+                pointLight.position.copy(cube.position);
+            }
+            break;
+        case 's':
+            if (cube) {
+                cube.position.y -= moveSpeed;
+                // Update point light position
+                pointLight.position.copy(cube.position);
+            }
+            break;
+            
+        // Camera movement
+        case 'a':
+            camera.position.x -= moveSpeed;
+            // Update view position uniform for shaders
+            scene.traverse((object) => {
+                if (object.material && object.material.uniforms && object.material.uniforms.viewPosition) {
+                    object.material.uniforms.viewPosition.value.copy(camera.position);
+                }
+            });
+            break;
+        case 'd':
+            camera.position.x += moveSpeed;
+            // Update view position uniform for shaders
+            scene.traverse((object) => {
+                if (object.material && object.material.uniforms && object.material.uniforms.viewPosition) {
+                    object.material.uniforms.viewPosition.value.copy(camera.position);
+                }
+            });
+            break;
+    }
 });
 
 // Animation loop
