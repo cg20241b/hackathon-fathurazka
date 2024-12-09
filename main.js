@@ -156,16 +156,21 @@ loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json
             glowColor: { type: 'c', value: new THREE.Color(0xffffff) },
             viewVector: { type: 'v3', value: camera.position },
             time: { type: 'f', value: 0.0 },
-            ambientLight: { value: 0.3 }
+            ambientLight: { value: 0.5 },
+            metalness: { value: 0.95 },
+            roughness: { value: 0.05 }
         },
         vertexShader: `
             uniform vec3 viewVector;
             varying vec3 vNormal;
             varying float intensity;
+            varying vec3 vViewDir;
+            
             void main() {
-                vec3 vNormal = normalize(normalMatrix * normal);
-                vec3 vNormel = normalize(normalMatrix * viewVector);
-                intensity = pow(1.0 - dot(vNormal, vNormel), 3.0);
+                vNormal = normalize(normalMatrix * normal);
+                vec3 worldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+                vViewDir = normalize(viewVector - worldPosition);
+                intensity = pow(1.0 - dot(vNormal, normalize(viewVector)), 3.0);
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
             }
         `,
@@ -173,12 +178,31 @@ loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json
             uniform vec3 glowColor;
             uniform float time;
             uniform float ambientLight;
+            uniform float metalness;
+            uniform float roughness;
+            
             varying vec3 vNormal;
+            varying vec3 vViewDir;
             varying float intensity;
             void main() {
-                float pulseFactor = 1.0 + 0.3 * sin(time * 2.0);
-                vec3 glow = glowColor * intensity * pulseFactor * 2.0;
-                gl_FragColor = vec4(glow, 1.0);
+                float pulseFactor = 1.0 + 0.5 * sin(time * 2.0); // Increased pulse amplitude
+            
+                // Enhanced Fresnel effect
+                float fresnelFactor = pow(1.0 - max(dot(vNormal, vViewDir), 0.0), 3.0); // Decreased power for stronger effect
+                
+                // Stronger metallic reflection
+                vec3 reflection = reflect(-vViewDir, vNormal);
+                float specIntensity = pow(max(dot(reflection, vViewDir), 0.0), 16.0); // Decreased for broader highlights
+                
+                // Intensified effects
+                vec3 metalColor = mix(glowColor, vec3(1.0), metalness);
+                vec3 specular = metalColor * specIntensity * (1.0 - roughness) * 2.0; // Doubled specular
+                vec3 glow = metalColor * intensity * pulseFactor * 3.0; // Increased glow multiplier
+                
+                vec3 finalColor = glow + specular + (fresnelFactor * metalColor * 0.8); // Increased fresnel contribution
+                finalColor += ambientLight * metalColor;
+                
+                gl_FragColor = vec4(finalColor, 1.0);
             }
         `,
         side: THREE.DoubleSide,
@@ -192,7 +216,7 @@ loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json
     scene.add(cube);
 
     // Add point light
-    const pointLight = new THREE.PointLight(0xffffff, 2, 50);
+    const pointLight = new THREE.PointLight(0xffffff, 3, 50);
     pointLight.position.set(0, 0, 0);
     scene.add(pointLight);
 });
